@@ -61,7 +61,6 @@ class TrtUnet(sd_unet.SdUnet):
         self.shape_hash = 0
 
     def forward(self, x, timesteps, context, *args, **kwargs):
-        print(shared.sd_model.sd_checkpoint_info.model_name)
         nvtx.range_push("forward")
         feed_dict = {
             "sample": x.float(),
@@ -73,7 +72,7 @@ class TrtUnet(sd_unet.SdUnet):
 
         # Need to check compatibility on the fly
         if self.shape_hash != hash(x.shape) or self.model_name != shared.sd_model.sd_checkpoint_info.model_name:
-            print("Switching engine.")
+            print(f"[I] Switching engine for {shared.sd_model.sd_checkpoint_info.model_name}")
             nvtx.range_push("switch_engine")
             if x.shape[-1] % 8 or x.shape[-2] % 8:
                 raise ValueError(
@@ -99,36 +98,38 @@ class TrtUnet(sd_unet.SdUnet):
         if len(valid_models) == 0:
             raise ValueError("No valid profile found. Please go to the TensorRT tab and generate an engine with the necessary profile. If using hires.fix, you need an engine for both the base and upscaled resolutions. Otherwise, use the default (torch) U-Net.")
         
-        print("Valid models: ", valid_models)
-
         best = valid_models[np.argmin(distances)]
         if best["filepath"] == (self.loaded_config["filepath"] if self.loaded_config else None):
             return
-        print(best)
 
         # Load the engine if it is not already in memory
         if best["filepath"] not in self.engines:
-            print("Loading engine. This may take a while.")
+            print("[I] Loading TensorRT Engine. This may take a while.")
             engine = Engine(os.path.join(TRT_MODEL_DIR, best["filepath"]))
             self.engines[best["filepath"]] = engine
             self.engines[best["filepath"]].load()
-            print(self.engines[best["filepath"]])
             
             if self.lora_path is not None:
                 engine.refit_from_dump(self.lora_path)
                 
             self.engines[best["filepath"]].activate(True)
         else:
-            print("Cached engine found.")
+            print("[I] Cached TensorRT Engine found.")
             engine = self.engines[best["filepath"]]
 
         self.loaded_config = best
-        self.engine_vram_req = self.engines[best["filepath"]].engine.device_memory_size
-        print("VRAM required: ", self.engine_vram_req)
+        self.engine_vram_req += self.engines[best["filepath"]].engine.device_memory_size
+        print(f"[I] VRAM required: {self.engines[best['filepath']].engine.device_memory_size / 1024 / 1024} MB, Total: {self.engine_vram_req / 1024 / 1024} MB")
         self.model_name = shared.sd_model.sd_checkpoint_info.model_name
+    
+    def activate(self):
+        pass
         
     def deactivate(self):
         self.shape_hash = 0
+        self.engine_vram_req = 0
+        for engine in self.engines.values():
+            del engine
 
 
 def list_unets(l):

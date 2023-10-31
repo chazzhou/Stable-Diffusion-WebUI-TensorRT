@@ -1189,7 +1189,7 @@ class OAIUNetXL(BaseModel):
 
 def make_OAIUNetXL(
     version, pipeline, device, verbose, max_batch_size, text_optlen, text_maxlen,
-    num_classes=None,
+    num_classes=2816,
 ):
     # Disable torch SDPA
     # if hasattr(F, "scaled_dot_product_attention"):
