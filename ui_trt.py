@@ -97,10 +97,19 @@ def export_unet_to_trt(
         min_textlen = max_textlen = opt_textlen
 
     if shared.sd_model.is_sdxl:
-        pipeline = PIPELINE_TYPE.SD_XL_BASE
-        modelobj = make_OAIUNetXL(
-            version, pipeline, "cuda", False, batch_max, opt_textlen, max_textlen
-        )
+        if shared.sd_model.sd_checkpoint_info.model_name.startswith("sd_xl_refiner"):
+            print("Using SD-XL Refiner pipeline.")
+            pipeline = PIPELINE_TYPE.SD_XL_REFINER
+            modelobj = make_OAIUNetXL(
+                version, pipeline, "cuda", False, batch_max, opt_textlen, max_textlen,
+                num_classes=2560
+            )
+        else:
+            print("Using SD-XL Base pipeline.")
+            pipeline = PIPELINE_TYPE.SD_XL_BASE
+            modelobj = make_OAIUNetXL(
+                version, pipeline, "cuda", False, batch_max, opt_textlen, max_textlen
+            )
         diable_optimizations = True
     else:
         modelobj = make_OAIUNet(
