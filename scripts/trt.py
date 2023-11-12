@@ -119,8 +119,7 @@ class TrtUnet(sd_unet.SdUnet):
 
         self.loaded_config = best
         
-        # Check and see if current engine requires more VRAM than the new one, take the max
-        self.engine_vram_req = max(self.engine_vram_req, self.engines[best["filepath"]].engine.device_memory_size)
+        self.engine_vram_req = self.engines[best["filepath"]].engine.device_memory_size
         print(f"[TRT] VRAM required: {self.engine_vram_req / 1024**3:.2f} GB")
         
         self.model_name = shared.sd_model.sd_checkpoint_info.model_name
