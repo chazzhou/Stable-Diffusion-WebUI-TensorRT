@@ -72,7 +72,7 @@ class TrtUnet(sd_unet.SdUnet):
 
         # Need to check compatibility on the fly
         if self.shape_hash != hash(x.shape) or self.model_name != shared.sd_model.sd_checkpoint_info.model_name:
-            print(f"[I] Switching engine for {shared.sd_model.sd_checkpoint_info.model_name}")
+            print(f"[TRT] Switching engine for {shared.sd_model.sd_checkpoint_info.model_name}")
             nvtx.range_push("switch_engine")
             if x.shape[-1] % 8 or x.shape[-2] % 8:
                 raise ValueError(
@@ -104,7 +104,7 @@ class TrtUnet(sd_unet.SdUnet):
 
         # Load the engine if it is not already in memory
         if best["filepath"] not in self.engines:
-            print("[I] Loading TensorRT Engine. This may take a while.")
+            print("[TRT] Loading TensorRT Engine. This may take a while.")
             engine = Engine(os.path.join(TRT_MODEL_DIR, best["filepath"]))
             self.engines[best["filepath"]] = engine
             self.engines[best["filepath"]].load()
@@ -114,18 +114,22 @@ class TrtUnet(sd_unet.SdUnet):
                 
             self.engines[best["filepath"]].activate(True)
         else:
-            print("[I] Cached TensorRT Engine found.")
+            print("[TRT] Cached TensorRT Engine found.")
             engine = self.engines[best["filepath"]]
 
         self.loaded_config = best
-        self.engine_vram_req += self.engines[best["filepath"]].engine.device_memory_size
-        print(f"[I] VRAM required: {self.engines[best['filepath']].engine.device_memory_size / 1024 / 1024} MB, Total: {self.engine_vram_req / 1024 / 1024} MB")
+        
+        # Check and see if current engine requires more VRAM than the new one, take the max
+        self.engine_vram_req = max(self.engine_vram_req, self.engines[best["filepath"]].engine.device_memory_size)
+        print(f"[TRT] VRAM required: {self.engine_vram_req / 1024**3:.2f} GB")
+        
         self.model_name = shared.sd_model.sd_checkpoint_info.model_name
     
     def activate(self):
         pass
         
     def deactivate(self):
+        print("[TRT] Deactivating TensorRT engine.")
         self.shape_hash = 0
         self.engine_vram_req = 0
         for engine in self.engines.values():

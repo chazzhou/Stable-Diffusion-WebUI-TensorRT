@@ -69,7 +69,7 @@ def export_unet_to_trt(
     use_fp32 = False
     if cc_major < 7:
         use_fp32 = True
-        print("[I] FP16 has been disabled because your GPU does not support it.")
+        print("[TRT] FP16 has been disabled because your GPU does not support it.")
 
     unet_hidden_dim = shared.sd_model.model.diffusion_model.in_channels
     if unet_hidden_dim == 9:
@@ -79,7 +79,7 @@ def export_unet_to_trt(
     model_name = shared.sd_model.sd_checkpoint_info.model_name
     onnx_filename, onnx_path = modelmanager.get_onnx_path(model_name, model_hash)
 
-    print(f"[I] Exporting {model_name} to TensorRT")
+    print(f"[TRT] Exporting {model_name} to TensorRT")
 
     timing_cache = modelmanager.get_timing_cache()
 
@@ -98,21 +98,21 @@ def export_unet_to_trt(
 
     if shared.sd_model.is_sdxl:
         if shared.sd_model.sd_checkpoint_info.model_name.startswith("sd_xl_refiner"):
-            print("[I] Using SD-XL Refiner pipeline.")
+            print("[TRT] Using SD-XL Refiner pipeline.")
             pipeline = PIPELINE_TYPE.SD_XL_REFINER
             modelobj = make_OAIUNetXL(
                 version, pipeline, "cuda", False, batch_max, opt_textlen, max_textlen,
                 num_classes=2560
             )
         else:
-            print("[I] Using SD-XL Base pipeline.")
+            print("[TRT] Using SD-XL Base pipeline.")
             pipeline = PIPELINE_TYPE.SD_XL_BASE
             modelobj = make_OAIUNetXL(
                 version, pipeline, "cuda", False, batch_max, opt_textlen, max_textlen
             )
         diable_optimizations = True
     else:
-        print("[I] Using SD-1/2 pipeline.")
+        print("[TRT] Using SD-1/2 pipeline.")
         modelobj = make_OAIUNet(
             version,
             pipeline,
@@ -139,7 +139,7 @@ def export_unet_to_trt(
     )
 
     if not os.path.exists(onnx_path):
-        print("[I] No ONNX file found. Exporting ONNX... This can take a while, please be patient.")
+        print("[TRT] No ONNX file found. Exporting ONNX... This can take a while, please be patient.")
         gr.Info("No ONNX file found. Exporting ONNX...  This can take a while, please check the progress in the terminal.")
         export_onnx(
             onnx_path,
@@ -147,14 +147,14 @@ def export_unet_to_trt(
             profile=profile,
             diable_optimizations=diable_optimizations,
         )
-        print(f"[I] Exported {model_name} to ONNX.")
+        print(f"[TRT] Exported {model_name} to ONNX.")
 
     trt_engine_filename, trt_path = modelmanager.get_trt_path(
         model_name, model_hash, profile, static_shapes
     )
 
     if not os.path.exists(trt_path) or force_export:
-        print("[I] Building TensorRT engine... This can take a while, please be patient.")
+        print("[TRT] Building TensorRT engine... This can take a while, please be patient.")
         gr.Info("Building TensorRT engine... This can take a while, please check the progress in the terminal.")
         gc.collect()
         torch.cuda.empty_cache()
@@ -168,7 +168,7 @@ def export_unet_to_trt(
         if ret:
             return "## Export Failed due to unknown reason. See shell for more information. \n"
 
-        print("[I] TensorRT engines has been saved to disk.")
+        print("[TRT] TensorRT engines has been saved to disk.")
         modelmanager.add_entry(
             model_name,
             model_hash,
@@ -182,9 +182,9 @@ def export_unet_to_trt(
             lora=False,
         )
     else:
-        print("[I] TensorRT engine found. Skipping build. You can enable Force Export in the Advanced Settings to force a rebuild if needed.")
+        print("[TRT] TensorRT engine found. Skipping build. You can enable Force Export in the Advanced Settings to force a rebuild if needed.")
 
-    return f"## Successfully exported TensorRT Engine for {model_name}. Please refresh the TensorRT Engine Profiles below. \n"
+    return "## Successfully exported TensorRT Engine. Please refresh the TensorRT Engine Profiles below. \n"
 
 
 def export_lora_to_trt(lora_name, force_export):
@@ -192,7 +192,7 @@ def export_lora_to_trt(lora_name, force_export):
     use_fp32 = False
     if cc_major < 7:
         use_fp32 = True
-        print("[I] FP16 has been disabled because your GPU does not support it.")
+        print("[TRT] FP16 has been disabled because your GPU does not support it.")
     unet_hidden_dim = shared.sd_model.model.diffusion_model.in_channels
     if unet_hidden_dim == 9:
         is_inpaint = True
@@ -236,7 +236,7 @@ def export_lora_to_trt(lora_name, force_export):
         diable_optimizations = False
 
     if not os.path.exists(onnx_lora_path):
-        print("[I] No ONNX file found. Exporting ONNX...")
+        print("[TRT] No ONNX file found. Exporting ONNX...")
         gr.Info("No ONNX file found. Exporting ONNX...  Please check the progress in the terminal.")
         export_onnx(
             onnx_lora_path,
@@ -247,7 +247,7 @@ def export_lora_to_trt(lora_name, force_export):
             diable_optimizations=diable_optimizations,
             lora_path=lora_model["filename"],
         )
-        print("[I] Exported to ONNX.")
+        print("[TRT] Exported to ONNX.")
 
     trt_lora_name = onnx_lora_filename.replace(".onnx", ".trt")
     trt_lora_path = os.path.join(TRT_MODEL_DIR, trt_lora_name)
@@ -263,13 +263,13 @@ def export_lora_to_trt(lora_name, force_export):
         return "## Please export the base model first."
 
     if not os.path.exists(trt_lora_path) or force_export:
-        print("[I] yNo TensorRT engine found. Building...")
+        print("[TRT] yNo TensorRT engine found. Building...")
         gr.Info("No TensorRT engine found. Building...")
 
         engine = Engine(trt_base_path)
         engine.load()
         engine.refit(onnx_base_path, onnx_lora_path, dump_refit_path=trt_lora_path)
-        print("[I] Built TensorRT engine.")
+        print("[TRT] Built TensorRT engine.")
 
         modelmanager.add_lora_entry(
             base_name,
@@ -280,7 +280,7 @@ def export_lora_to_trt(lora_name, force_export):
             0,
             unet_hidden_dim,
         )
-    return f"## Successfully exported TensorRT Engine for {model_name}. Please refresh the TensorRT Engine Profiles below. \n"
+    return "## Successfully exported TensorRT Engine. Please refresh the TensorRT Engine Profiles below. \n"
 
 
 def export_default_unet_to_trt():

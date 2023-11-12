@@ -195,7 +195,7 @@ class Engine:
                     values = convert_int64(values)
                 refit_dict[name] = values
 
-        print(f"[I] Refitting TensorRT engine with {onnx_refit_path} weights")
+        print(f"[TRT] Refitting TensorRT engine with {onnx_refit_path} weights")
         refit_nodes = gs.import_onnx(onnx.load(onnx_refit_path)).toposort().nodes
 
         # Construct mapping from weight names in refit model -> original model
@@ -273,7 +273,7 @@ class Engine:
                         add_to_map(refit_dict, name, inp.values)
 
         if dump_refit_path is not None:
-            print("[I] Finished refit. Dumping result to disk.")
+            print("[TRT] Finished refit. Dumping result to disk.")
             save_file(
                 refit_dict, dump_refit_path
             )  # TODO need to come up with delta system to save only changed weights
@@ -340,7 +340,7 @@ class Engine:
         timing_cache=None,
         update_output_names=None,
     ):
-        print(f"[I] Building TensorRT engine for {onnx_path}: {self.engine_path}")
+        print(f"[TRT] Building TensorRT engine for {onnx_path}: {self.engine_path}")
         p = [Profile()]
         if input_profile:
             p = [Profile() for i in range(len(input_profile))]
@@ -357,7 +357,7 @@ class Engine:
             onnx_path, flags=[trt.OnnxParserFlag.NATIVE_INSTANCENORM]
         )
         if update_output_names:
-            print(f"[I] Updating network outputs to {update_output_names}")
+            print(f"[TRT] Updating network outputs to {update_output_names}")
             network = ModifyNetworkOutputs(network, update_output_names)
 
         builder = network[0]
@@ -415,7 +415,7 @@ class Engine:
         return 0
 
     def load(self):
-        print(f"[I] Loading TensorRT engine: {self.engine_path}")
+        print(f"[TRT] Loading TensorRT engine: {self.engine_path}")
         self.engine = engine_from_bytes(bytes_from_path(self.engine_path))
 
     def activate(self, reuse_device_memory=None):
@@ -460,7 +460,7 @@ class Engine:
     def __str__(self):
         out = ""
         for opt_profile in range(self.engine.num_optimization_profiles):
-            out += f"[I] Profile {opt_profile}:\n"
+            out += f"[TRT] Profile {opt_profile}:\n"
             for binding_idx in range(self.engine.num_bindings):
                 name = self.engine.get_binding_name(binding_idx)
                 shape = self.engine.get_profile_shape(opt_profile, name)
